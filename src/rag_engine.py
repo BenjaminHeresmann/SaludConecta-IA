@@ -29,29 +29,13 @@ def build_vectorstore():
     chunks = text_splitter.split_documents(documents)
     print(f"✅ Texto dividido en {len(chunks)} fragmento(s).")
 
-    print("🧠 Generando embeddings con Google (gemini-embedding-001)...")
-
-    google_api_key = os.getenv("GOOGLE_API_KEY")
-    if not google_api_key:
-        raise RuntimeError(
-            "Falta GOOGLE_API_KEY. Configúrala en el archivo .env antes de ejecutar el motor RAG."
-        )
-
+    print("🧠 Generando embeddings con LangChain y Google...")
     embeddings = GoogleGenerativeAIEmbeddings(
-        model=os.getenv("GOOGLE_EMBEDDING_MODEL", "models/gemini-embedding-001"),
-        google_api_key=google_api_key
+        model="models/gemini-embedding-001",
+        google_api_key=os.getenv("GOOGLE_API_KEY")
     )
-
-    try:
-        vectorstore = FAISS.from_documents(chunks, embeddings)
-    except Exception as error:
-        if "403" in str(error) and "project has been denied access" in str(error):
-            raise RuntimeError(
-                "Google denegó el acceso al proyecto asociado a GOOGLE_API_KEY. "
-                "Crea o selecciona un proyecto habilitado, activa la Generative Language API, "
-                "genera una clave nueva y actualiza GOOGLE_API_KEY en .env."
-            ) from error
-        raise
+    
+    vectorstore = FAISS.from_documents(chunks, embeddings)
     
     output_folder = "faiss_index"
     vectorstore.save_local(output_folder)
