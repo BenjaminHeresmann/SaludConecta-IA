@@ -1,53 +1,72 @@
 import os
+import re
+import traceback
 from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+from openai import OpenAI
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 
 load_dotenv()
 
-SYSTEM_PROMPT = """Eres ConectaBot, el asistente virtual de la Red de Salud SaludConecta.
-Tu objetivo es ayudar a los pacientes con dudas sobre citas médicas y protocolos de preparación.
+# Prompt ajustado para forzar salida directa sin etiquetas de razonamiento
+SYSTEM_PROMPT = """Eres ConectaBot, el asistente virtual oficial de la Red de Salud SaludConecta.
+Tu objetivo es responder las consultas de los pacientes utilizando exclusivamente el contexto proporcionado.
 
-Reglas obligatorias:
-1. Responde SIEMPRE de forma amable, profesional y en un máximo de 3 oraciones.
-2. Utiliza la información del contexto entregado para responder sobre protocolos o citas.
-3. PROHIBICIÓN ABSOLUTA: No des diagnósticos médicos, ni recetes medicamentos. Si el usuario consulta por síntomas o emergencias, indícale de inmediato que debe acudir a un centro médico o urgencias.
-
-Contexto oficial:
-{context}
-
-Pregunta del usuario:
-{question}
+REGLAS OBLIGATORIAS:
+1. Responde SIEMPRE en español de forma amable, clara y profesional.
+2. Utiliza la información del contexto adjunto para responder sobre cancelaciones, emergencias, preparaciones o citas.
+3. PROHIBICIÓN DE RAZONAMIENTO: No incluyas cadenas de pensamiento, reflexiones ni etiquetas <think>. Escribe DIRECTAMENTE la respuesta final para el usuario.
+4. Si el contexto no contiene la respuesta, indica amablemente que no dispones de esa información en el sistema.
+5. PROHIBICIÓN ABSOLUTA: No des diagnósticos médicos ni recetes medicamentos. Ante síntomas graves o emergencias, indica acudir de inmediato a urgencias.
 """
 
 def get_agent_chain():
     embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001",
+        model="gemini-embedding-001",
+        output_dimensionality=768,
         google_api_key=os.getenv("GOOGLE_API_KEY")
     )
     
     vectorstore = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
-    llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
-        temperature=0.2,
-        groq_api_key=os.getenv("GROQ_API_KEY")
+    client = OpenAI(
+        base_url="https://api.groq.com/openai/v1",
+        api_key=os.getenv("GROQ_API_KEY"),
     )
-
-    prompt = ChatPromptTemplate.from_template(SYSTEM_PROMPT)
-    
-    def format_docs(docs):
-        return "\n\n".join(doc.page_content for doc in docs)
 
     def run_chain(question):
         docs = retriever.invoke(question)
-        context = format_docs(docs)
-        chain = prompt | llm | StrOutputParser()
-        return chain.invoke({"context": context, "question": question})
+        context = "\n\n".join(doc.page_content for doc in docs)
+        
+        prompt_completo = f"{SYSTEM_PROMPT}\n\nContexto extraído de los documentos:\n{context}"
+
+        response = client.chat.completions.create(
+            model="qwen/qwen3.6-27b",
+            messages=[
+                {"role": "system", "content": prompt_completo},
+                {"role": "user", "content": question}
+            ],
+            temperature=0.1,
+            max_tokens=450  # Límite ampliado para permitir la respuesta tras el contexto
+        )
+        
+        raw_content = response.choices[0].message.content or ""
+        
+        # Limpieza de cualquier etiqueta <think> que el modelo genere
+        if "</think>" in raw_content:
+            clean_content = raw_content.split("</think>")[-1].strip()
+        else:
+            clean_content = re.sub(r'<think>.*?</think>', '', raw_content, flags=re.DOTALL)
+            clean_content = re.sub(r'<think>.*', '', clean_content, flags=re.DOTALL).strip()
+            
+        if not clean_content:
+            # Si el modelo consumió los tokens antes de cerrar el pensamiento, mostramos la salida cruda filtrada
+            clean_content = re.sub(r'<think>.*?</think>', '', raw_content, flags=re.DOTALL).strip()
+            if not clean_content:
+                clean_content = "Hola. No dispongo de información específica sobre esos requisitos en el sistema. Te sugiero contactar directamente a la recepción de SaludConecta para más detalles."
+
+        return clean_content
 
     return run_chain
 
@@ -64,7 +83,8 @@ if __name__ == "__main__":
                 break
             
             response = agent_chain(user_input)
-            print(f"ConectaBot: {response}\n")
+            print(f"\nConectaBot: {response}\n")
             
     except Exception as e:
-        print(f"⚠️ Error al iniciar el agente: {e}")
+        print(f"⚠️ Error en el agente: {e}")
+        traceback.print_exc()
