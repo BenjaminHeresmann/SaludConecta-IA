@@ -72,11 +72,18 @@ class Contexto:
     paciente_id: str
     memorias: str = ""
     hoy: str = ""
+    registrado: bool = True
 
 
 @dynamic_prompt
 def prompt_de_sesion(request: ModelRequest) -> str:
     ctx = request.runtime.context
+    if not ctx.registrado:
+        return (f"{SYSTEM_PROMPT}\nDATOS DE LA SESIÓN:\n- Usuario: VISITANTE NO REGISTRADO en SaludConecta.\n"
+                f"- Fecha de hoy: {ctx.hoy}\n"
+                "- Solo puedes informar: protocolos y preparación (buscar_protocolos) y cupos disponibles "
+                "(buscar_cupos_disponibles). NO tiene citas ni ficha: no uses herramientas que requieran paciente_id. "
+                "Para agendar, indícale que primero debe registrarse en la recepción de cualquier sede o en saludconecta.cl.")
     return (f"{SYSTEM_PROMPT}\nDATOS DE LA SESIÓN:\n- Paciente autenticado: {ctx.paciente_id}\n"
             f"- Fecha de hoy: {ctx.hoy}\n- Memoria de largo plazo relevante (recuperada por similitud):\n"
             f"{ctx.memorias or '  (sin recuerdos previos)'}")
@@ -125,7 +132,11 @@ class ConectaBot:
             registrar("memoria", "Recuerdos recuperados: " + "; ".join(f"{r['texto']} ({r['metodo']} {r['similitud']})"
                                                                      for r in recuerdos))
         memorias = "\n".join(f"  - [{r['tipo']}] {r['texto']}" for r in recuerdos)
-        contexto = Contexto(paciente_id=paciente_id, memorias=memorias, hoy=obtener_agenda().datos["hoy"])
+        agenda = obtener_agenda()
+        registrado = paciente_id in agenda.datos["pacientes"]
+        if not registrado:
+            registrar("info", f"{paciente_id} no está registrado: modo visitante (solo información, sin agendar).")
+        contexto = Contexto(paciente_id=paciente_id, memorias=memorias, hoy=agenda.datos["hoy"], registrado=registrado)
         resultado = self.agente.invoke({"messages": [{"role": "user", "content": mensaje}]},
                                        config={"configurable": {"thread_id": f"{paciente_id}-{sesion}"}},
                                        context=contexto)

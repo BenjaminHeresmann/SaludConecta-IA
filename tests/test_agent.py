@@ -205,3 +205,12 @@ def test_cancelar_cita_reasigna_el_cupo_en_la_misma_operacion(agenda):
     r = json.loads(cancelar_cita.invoke({"cita_id": "C007", "motivo": "viaje"}))
     assert r["cupo_reasignado"] is True and r["reasignado_a"] == "P009"
     assert agenda.datos["cupos"]["K021"]["estado"] == "ocupado"
+
+
+def test_visitante_no_registrado_recibe_prompt_restringido(agenda, memoria, monkeypatch):
+    import src.agent as agente
+    llm = LLMGuionado(respuestas=[AIMessage(content="Para agendar debe registrarse en recepción.")])
+    monkeypatch.setattr(agente, "crear_cascada", lambda *a, **k: [llm, llm])
+    respuesta = agente.ConectaBot().chatear("VISITANTE", "Quiero una hora de cardiología")
+    prompt_sistema = [m for m in llm.recibido[0] if m.type == "system"][0].content
+    assert "VISITANTE NO REGISTRADO" in prompt_sistema and "registrarse" in respuesta
