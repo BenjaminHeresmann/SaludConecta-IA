@@ -61,8 +61,8 @@ El sistema tiene dos modos:
 | Componente | Tecnología | Archivo |
 |---|---|---|
 | Framework de agentes | LangChain 1.4 `create_agent` (grafo de LangGraph) con middleware | `src/agent.py` |
-| LLM | Groq, `qwen/qwen3.6-27b`, razonamiento oculto; respaldo `llama-3.3-70b-versatile` con `ModelFallbackMiddleware` | `src/config.py` |
-| RAG | `PyPDFDirectoryLoader` + `TextLoader`, chunks 350/50, `gemini-embedding-001` (768 dim), FAISS, k=3 | `src/rag_engine.py` |
+| LLM | Groq, `qwen/qwen3.8-27b`, razonamiento oculto; respaldo `openai/gpt-oss-120b` con `ModelFallbackMiddleware` | `src/config.py` |
+| RAG | `PyPDFDirectoryLoader` + `TextLoader`, chunks 350/50, FAISS, k=3. Embeddings locales con FastEmbed (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dim) por defecto; `gemini-embedding-001` (EP1) opcional con `EMBEDDINGS_PROVIDER=gemini` | `src/rag_engine.py` |
 | Memoria de corto plazo | `InMemorySaver` (un `thread_id` por sesión) + `SummarizationMiddleware` (sobre 14 mensajes resume y conserva 6) | `src/agent.py` |
 | Memoria de largo plazo | SQLite con embedding por recuerdo y recuperación por similitud coseno; respaldo por palabras si no hay API | `src/memoria.py` |
 | Planificación | Plan-and-Execute con salida estructurada (Pydantic), prioridades 1-5, dependencias y replanificación | `src/planner.py` |
@@ -102,7 +102,7 @@ Lista de espera: primero la urgencia clínica, después la sede preferida y desp
 
 ## Instalación
 
-Requisitos: Python 3.12 o superior, Git y claves de Groq y Google AI Studio.
+Requisitos: Python 3.12 o superior, Git y una clave de Groq. La clave de Google AI Studio solo se necesita si usas `EMBEDDINGS_PROVIDER=gemini`.
 
 ```bash
 git clone https://github.com/BenjaminHeresmann/SaludConecta-IA.git
@@ -120,7 +120,7 @@ Edita `.env` con tus claves. `.env` está en `.gitignore`: nunca lo subas al rep
 Todos los comandos se ejecutan desde la raíz del repositorio.
 
 ```bash
-python -m src.rag_engine          # 1. construye el índice FAISS desde data/docs_rag (una vez)
+python -m src.rag_engine          # 1. construye el índice FAISS (la primera vez descarga el modelo de embeddings, unos 240 MB, en <unidad>:\modelos-ia)
 python -m src.demo --pausa        # 2. demo de 6 escenarios, con pausa entre ellos
 python -m src.agent --paciente P001 --reset   # chat libre con un paciente
 python -m src.demo --sin-llm      # modo coordinador con el planificador por reglas (sin API)
@@ -177,6 +177,8 @@ SaludConecta-IA/
 - `protocolos_ampliados.md` es un documento simulado para el proyecto; no reemplaza indicaciones médicas.
 - La memoria de corto plazo vive en RAM: al reiniciar el agente solo queda la de largo plazo.
 - Groq tiene límites de uso por minuto en el plan gratuito; si se exceden, el agente pasa al modelo de respaldo.
+- En la EP1 los embeddings eran de Gemini. En la EP2 la API de Gemini devolvió `403 PERMISSION_DENIED` para el proyecto de la clave, por eso el valor por defecto es un modelo local; el índice de Gemini sigue disponible como opción.
+- FAISS (C++) no abre rutas con tildes en Windows: el índice se guarda como bytes desde Python (`faiss_index_local/indice_ep2.bin`).
 
 ## Uso de IA en el desarrollo
 
