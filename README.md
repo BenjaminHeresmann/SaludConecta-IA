@@ -16,29 +16,39 @@ La Red de Salud SaludConecta (5 sedes, más de 120 especialistas, unas 15.000 ci
 
 ```mermaid
 flowchart LR
-    U[Paciente<br/>chat o WhatsApp simulado] --> G{Guardrail<br/>de emergencias}
-    G -- emergencia --> H[derivar_a_humano<br/>urgencia alta]
-    G -- consulta normal --> ML[(Memoria de largo plazo<br/>SQLite + similitud coseno)]
-    ML --> A[ConectaBot<br/>LangChain create_agent<br/>ciclo ReAct en LangGraph]
-    A <--> LLM[Groq: Qwen 3.6 27B<br/>respaldo: Llama 3.3 70B]
-    A <--> MC[Memoria de corto plazo<br/>checkpointer + resumen]
-    A --> TC[Tools de consulta]
-    A --> TE[Tools de escritura]
-    A --> TR[Tool de razonamiento]
-    TC --> RAG[RAG: FAISS +<br/>Gemini embeddings]
-    TC --> AG[(Agenda simulada)]
+    subgraph PAC[Modo paciente: src/agent.py]
+        U[Paciente<br/>chat o WhatsApp simulado] --> G{Guardrail<br/>de emergencias}
+        G -- emergencia --> H[derivar_a_humano<br/>urgencia alta]
+        G -- consulta normal --> A[ConectaBot<br/>LangChain create_agent<br/>ciclo ReAct en LangGraph]
+        A <--> LLM[Groq: Qwen 3.6 27B<br/>respaldo: Llama 3.3 70B]
+        A <--> MC[Memoria de corto plazo<br/>checkpointer + resumen]
+        A --> TC[Tools de consulta]
+        A --> TE[Tools de escritura]
+        A --> TR[Tool de razonamiento]
+    end
+    subgraph DAT[Datos y conocimiento]
+        RAG[RAG: FAISS +<br/>Gemini embeddings]
+        AG[(Agenda simulada)]
+        ML[(Memoria de largo plazo<br/>SQLite + similitud coseno)]
+        WA[(Mensajes enviados)]
+    end
+    subgraph COO[Modo coordinador: src/planner.py]
+        PL[Planificador LLM<br/>plan JSON: acción,<br/>prioridad, dependencias] --> EJ[Ejecutor por prioridad]
+        EJ -- paso falla --> RP[Replanificación]
+        EV[Evento externo:<br/>cancelación o cupo tomado] --> RP
+        RP --> PL
+    end
+    ML -. recuerdos .-> A
+    TC --> RAG
+    TC --> AG
+    TC --> ML
     TE --> AG
-    TR --> AG
-    TE --> WA[(Mensajes enviados)]
+    TE --> WA
     TE --> ML
-
-    CO[Coordinador<br/>src/planner.py] --> PL[Plan JSON<br/>acción, prioridad, dependencias]
-    PL --> EJ[Ejecutor por prioridad]
+    TR --> AG
     EJ --> AG
     EJ --> RAG
-    EV[Evento externo:<br/>cancelación o cupo tomado] --> RP[Replanificación]
-    EJ -- paso falla --> RP
-    RP --> PL
+    EJ --> WA
 ```
 
 El sistema tiene dos modos:
