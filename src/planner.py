@@ -214,11 +214,13 @@ def mostrar_plan(plan: Plan, origen: str):
 
 def ejecutar(objetivo: str = "Gestionar las citas de las próximas 48 horas para reducir inasistencias",
              eventos: dict[int, Callable[[Agenda], str]] | None = None, llm=None,
-             agenda: Agenda | None = None, max_replan: int = 3) -> dict:
-    """Ejecuta el plan. `eventos` simula cambios del entorno: {n° de paso: función(agenda) -> cupo liberado}."""
+             agenda: Agenda | None = None, max_replan: int = 3,
+             cupos_liberados: list[str] | None = None) -> dict:
+    """Ejecuta el plan. `eventos` simula cambios del entorno: {n° de paso: función(agenda) -> cupo liberado}.
+    `cupos_liberados`: cupos que ya estaban libres por cancelaciones previas (ej. hechas desde el chat)."""
     agenda = agenda or obtener_agenda()
     eventos = dict(eventos or {})
-    cupos_liberados: list[str] = []
+    cupos_liberados = list(cupos_liberados or [])
     plan, origen = planificar(objetivo, construir_estado(agenda, cupos_liberados), llm)
     mostrar_plan(plan, origen)
     pendientes, hechos, completados, replans, n = list(plan.pasos), [], set(), 0, 0

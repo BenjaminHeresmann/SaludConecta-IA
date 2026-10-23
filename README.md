@@ -124,6 +124,8 @@ python -m src.rag_engine          # 1. construye el índice FAISS (la primera ve
 python -m src.demo --pausa        # 2. demo de 6 escenarios, con pausa entre ellos
 python -m src.agent --paciente P001 --reset   # chat libre con un paciente
 python -m src.demo --sin-llm      # modo coordinador con el planificador por reglas (sin API)
+python -m src.coordinador         # coordinador sobre la agenda actual (ve lo que hicieron los pacientes en el chat)
+python -m src.coordinador --reiniciar   # deja la agenda como al inicio
 ```
 
 ### Escenarios de la demo
