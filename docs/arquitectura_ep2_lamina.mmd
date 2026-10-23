@@ -1,0 +1,13 @@
+%%{init: {"themeVariables": {"fontSize": "26px"}, "flowchart": {"nodeSpacing": 30, "rankSpacing": 45}}}%%
+flowchart LR
+    U[Paciente] --> G{Guardrail<br/>emergencias}
+    G -- emergencia --> H[Urgencias +<br/>derivar a humano]
+    G -- normal --> A[ConectaBot<br/>create_agent ReAct<br/>LLM Groq Qwen 3.6 27B]
+    A <--> MC[Memoria<br/>corto plazo]
+    A --> T[11 tools<br/>consulta, escritura,<br/>razonamiento]
+    T --> D[(Agenda, RAG FAISS,<br/>memoria SQLite,<br/>mensajes)]
+    CO[Coordinador:<br/>plan por prioridad] --> E[Ejecutor]
+    E --> D
+    E -- falla --> R[Replanificar]
+    EV[Evento externo] --> R
+    R --> CO
