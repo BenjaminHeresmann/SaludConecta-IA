@@ -97,6 +97,9 @@ def main():
         escenarios[n](bot)
         if args.pausa and n < 6:
             input(f"\n{Style.DIM}[Enter para el siguiente escenario]{Style.RESET_ALL}")
+    obtener_agenda().reiniciar()  # deja la agenda limpia para el chat libre
+    print(f"
+{Style.DIM}(Agenda reiniciada para el chat libre){Style.RESET_ALL}")
     con_llm = [s for s in LATENCIAS if s >= 0.1]  # el guardrail responde sin LLM (0 s)
     if con_llm:
         print(f"\nLatencia por consulta con LLM: promedio {sum(con_llm) / len(con_llm):.1f} s, "
