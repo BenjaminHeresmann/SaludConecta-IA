@@ -1,7 +1,7 @@
 # SaludConecta-IA — Agente ConectaBot para gestión autónoma de citas
 
 Proyecto de ISY0101 Ingeniería de Soluciones con Inteligencia Artificial (DuocUC, 2026-2).
-Integrantes: Diego Hernández y Benjamín Heresmann.
+Integrantes: Diego Hernández y Benjamín Heresmann. Continúa el repositorio de la EP1 (github.com/Diego-ai-he/SaludConecta-IA).
 
 La Red de Salud SaludConecta (5 sedes, más de 120 especialistas, unas 15.000 citas al mes) pierde el 28 % de sus horas por inasistencias no avisadas y su call center gasta más del 40 % de la jornada en confirmaciones manuales. En la EP1 construimos un RAG que responde dudas de preparación. En la EP2 lo convertimos en un **agente funcional** que consulta, escribe y razona sobre la agenda: confirma, reagenda, cancela, recupera cupos para la lista de espera y planifica la gestión diaria por prioridades.
 
@@ -105,7 +105,7 @@ Lista de espera: primero la urgencia clínica, después la sede preferida y desp
 Requisitos: Python 3.12 o superior, Git y claves de Groq y Google AI Studio.
 
 ```bash
-git clone https://github.com/Diego-ai-he/SaludConecta-IA.git
+git clone https://github.com/BenjaminHeresmann/SaludConecta-IA.git
 cd SaludConecta-IA
 python -m venv venv
 .\venv\Scripts\activate
