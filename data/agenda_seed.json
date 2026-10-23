@@ -1,0 +1,52 @@
+{
+  "_nota": "Datos simulados y anonimizados (Ley 19.628). 'dia' es el desfase en días desde hoy; se convierte en fecha al reiniciar el estado.",
+  "pacientes": {
+    "P001": {"edad": 34, "comuna": "Viña del Mar", "citas_previas": 10, "inasistencias_previas": 1},
+    "P002": {"edad": 24, "comuna": "Valparaíso", "citas_previas": 6, "inasistencias_previas": 3},
+    "P003": {"edad": 67, "comuna": "Quilpué", "citas_previas": 20, "inasistencias_previas": 0},
+    "P004": {"edad": 7, "comuna": "Santiago Centro", "citas_previas": 8, "inasistencias_previas": 2},
+    "P005": {"edad": 45, "comuna": "Rancagua", "citas_previas": 5, "inasistencias_previas": 1},
+    "P006": {"edad": 52, "comuna": "Viña del Mar", "citas_previas": 12, "inasistencias_previas": 4},
+    "P007": {"edad": 38, "comuna": "Valparaíso", "citas_previas": 9, "inasistencias_previas": 0},
+    "P008": {"edad": 27, "comuna": "Quilpué", "citas_previas": 3, "inasistencias_previas": 1},
+    "P009": {"edad": 71, "comuna": "Valparaíso", "citas_previas": 15, "inasistencias_previas": 0},
+    "P010": {"edad": 58, "comuna": "Viña del Mar", "citas_previas": 4, "inasistencias_previas": 0},
+    "P011": {"edad": 31, "comuna": "Valparaíso", "citas_previas": 2, "inasistencias_previas": 0},
+    "P012": {"edad": 44, "comuna": "Viña del Mar", "citas_previas": 6, "inasistencias_previas": 1}
+  },
+  "cupos": {
+    "K001": {"sede": "Viña del Mar", "especialidad": "Laboratorio", "medico": "LAB-01", "dia": 2, "hora": "08:30", "estado": "ocupado"},
+    "K002": {"sede": "Viña del Mar", "especialidad": "Laboratorio", "medico": "LAB-01", "dia": 2, "hora": "15:00", "estado": "libre"},
+    "K003": {"sede": "Viña del Mar", "especialidad": "Laboratorio", "medico": "LAB-02", "dia": 2, "hora": "16:00", "estado": "libre"},
+    "K004": {"sede": "Viña del Mar", "especialidad": "Laboratorio", "medico": "LAB-01", "dia": 3, "hora": "15:30", "estado": "libre"},
+    "K005": {"sede": "Viña del Mar", "especialidad": "Laboratorio", "medico": "LAB-02", "dia": 3, "hora": "09:00", "estado": "libre"},
+    "K010": {"sede": "Valparaíso", "especialidad": "Dermatología", "medico": "DER-01", "dia": 2, "hora": "10:00", "estado": "ocupado"},
+    "K011": {"sede": "Valparaíso", "especialidad": "Dermatología", "medico": "DER-01", "dia": 4, "hora": "11:00", "estado": "libre"},
+    "K012": {"sede": "Quilpué", "especialidad": "Dermatología", "medico": "DER-02", "dia": 1, "hora": "17:00", "estado": "ocupado"},
+    "K020": {"sede": "Viña del Mar", "especialidad": "Cardiología", "medico": "CAR-01", "dia": 1, "hora": "11:00", "estado": "ocupado"},
+    "K021": {"sede": "Valparaíso", "especialidad": "Cardiología", "medico": "CAR-02", "dia": 2, "hora": "12:00", "estado": "ocupado"},
+    "K022": {"sede": "Valparaíso", "especialidad": "Cardiología", "medico": "CAR-02", "dia": 5, "hora": "10:00", "estado": "libre"},
+    "K030": {"sede": "Santiago Centro", "especialidad": "Pediatría", "medico": "PED-01", "dia": 1, "hora": "15:00", "estado": "ocupado"},
+    "K031": {"sede": "Santiago Centro", "especialidad": "Pediatría", "medico": "PED-01", "dia": 1, "hora": "18:00", "estado": "libre"},
+    "K040": {"sede": "Rancagua", "especialidad": "Imagenología", "medico": "IMG-01", "dia": 2, "hora": "09:00", "estado": "ocupado"},
+    "K041": {"sede": "Rancagua", "especialidad": "Imagenología", "medico": "IMG-01", "dia": 3, "hora": "09:30", "estado": "libre"},
+    "K050": {"sede": "Viña del Mar", "especialidad": "Medicina General", "medico": "MG-01", "dia": 1, "hora": "16:30", "estado": "ocupado"},
+    "K051": {"sede": "Viña del Mar", "especialidad": "Medicina General", "medico": "MG-01", "dia": 2, "hora": "17:00", "estado": "libre"}
+  },
+  "citas": {
+    "C001": {"paciente_id": "P001", "cupo_id": "K001", "tipo": "examen de sangre", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 7},
+    "C002": {"paciente_id": "P002", "cupo_id": "K010", "tipo": "consulta", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 30},
+    "C003": {"paciente_id": "P003", "cupo_id": "K020", "tipo": "consulta", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 10},
+    "C004": {"paciente_id": "P004", "cupo_id": "K030", "tipo": "consulta", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 10},
+    "C005": {"paciente_id": "P005", "cupo_id": "K040", "tipo": "ecografía abdominal", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 25},
+    "C006": {"paciente_id": "P006", "cupo_id": "K050", "tipo": "consulta", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 20},
+    "C007": {"paciente_id": "P007", "cupo_id": "K021", "tipo": "consulta", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 3},
+    "C008": {"paciente_id": "P008", "cupo_id": "K012", "tipo": "consulta", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 5}
+  },
+  "lista_espera": [
+    {"paciente_id": "P009", "especialidad": "Cardiología", "sede_preferida": "Valparaíso", "urgencia": 1, "dias_en_espera": 40},
+    {"paciente_id": "P010", "especialidad": "Cardiología", "sede_preferida": "Viña del Mar", "urgencia": 2, "dias_en_espera": 60},
+    {"paciente_id": "P011", "especialidad": "Dermatología", "sede_preferida": "Valparaíso", "urgencia": 2, "dias_en_espera": 15},
+    {"paciente_id": "P012", "especialidad": "Medicina General", "sede_preferida": "Viña del Mar", "urgencia": 3, "dias_en_espera": 8}
+  ]
+}

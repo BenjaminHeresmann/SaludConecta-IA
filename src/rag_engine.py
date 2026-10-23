@@ -1,38 +1,49 @@
-import os
-from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFDirectoryLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_community.vectorstores import FAISS
+"""Motor RAG: ingesta de protocolos (PDF y Markdown) y búsqueda semántica en FAISS.
 
-load_dotenv()
+Construir el índice:  python -m src.rag_engine
+"""
+from langchain_community.document_loaders import DirectoryLoader, PyPDFDirectoryLoader, TextLoader
+from langchain_community.vectorstores import FAISS
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from src.config import DOCS_RAG, FAISS_DIR, crear_embeddings
+
 
 def build_vectorstore():
-    print("🚀 Iniciando el proceso del Motor RAG...")
-    
-    docs_path = "data/docs_rag"
-    loader = PyPDFDirectoryLoader(docs_path)
-    documents = loader.load()
-    
+    print("Iniciando el proceso del Motor RAG...")
+    documents = PyPDFDirectoryLoader(str(DOCS_RAG)).load()
+    documents += DirectoryLoader(str(DOCS_RAG), glob="*.md", loader_cls=TextLoader,
+                                 loader_kwargs={"encoding": "utf-8"}).load()
     if not documents:
-        print("⚠️ No se encontraron documentos PDF en data/docs_rag.")
+        print("No se encontraron documentos en data/docs_rag.")
         return None
 
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=350,
-        chunk_overlap=50
-    )
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=350, chunk_overlap=50)
     chunks = text_splitter.split_documents(documents)
 
-    print("🧠 Generando embeddings con Google Gemini...")
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="gemini-embedding-001",
-        output_dimensionality=768
-    )
-    
-    vectorstore = FAISS.from_documents(chunks, embeddings)
-    vectorstore.save_local("faiss_index")
-    print("🎉 ¡Base de datos vectorial creada y guardada con éxito!")
+    print(f"Generando embeddings con Google Gemini para {len(chunks)} fragmentos...")
+    vectorstore = FAISS.from_documents(chunks, crear_embeddings())
+    vectorstore.save_local(str(FAISS_DIR))
+    print("Base de datos vectorial creada y guardada en faiss_index/.")
+    return vectorstore
+
+
+_vectorstore = None
+
+
+def cargar_vectorstore():
+    global _vectorstore
+    if _vectorstore is None:
+        _vectorstore = FAISS.load_local(str(FAISS_DIR), crear_embeddings(), allow_dangerous_deserialization=True)
+    return _vectorstore
+
+
+def buscar(consulta: str, k: int = 3) -> list[dict]:
+    """Devuelve los k fragmentos más similares con su distancia L2 (menor = más parecido) y su fuente."""
+    resultados = cargar_vectorstore().similarity_search_with_score(consulta, k=k)
+    return [{"texto": doc.page_content, "fuente": doc.metadata.get("source", "").split("\\")[-1].split("/")[-1],
+             "distancia": round(float(score), 4)} for doc, score in resultados]
+
 
 if __name__ == "__main__":
     build_vectorstore()
