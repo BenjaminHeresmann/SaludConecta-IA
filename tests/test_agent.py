@@ -134,3 +134,57 @@ def test_recuperacion_semantica_por_coseno(tmp_path):
     m.guardar("P001", "Prefiere horarios de tarde")
     top = m.recuperar("P001", "¿a qué hora de la tarde?")[0]
     assert top["texto"] == "Prefiere horarios de tarde" and top["metodo"] == "coseno"
+
+
+# ---------- ciclo completo del agente con un LLM simulado ----------
+from langchain_core.language_models.chat_models import BaseChatModel  # noqa: E402
+from langchain_core.messages import AIMessage  # noqa: E402
+from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
+
+
+class LLMGuionado(BaseChatModel):
+    """Devuelve respuestas fijas en orden; registra lo que recibe. Sin red."""
+    respuestas: list = []
+    recibido: list = []
+    i: int = 0
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        self.recibido.append(messages)
+        respuesta = self.respuestas[min(self.i, len(self.respuestas) - 1)]
+        self.i += 1
+        return ChatResult(generations=[ChatGeneration(message=respuesta)])
+
+    @property
+    def _llm_type(self):
+        return "guionado"
+
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+
+def test_agente_se_recupera_de_cupo_tomado_y_usa_memoria(agenda, memoria, monkeypatch):
+    import src.agent as agente
+    memoria.guardar("P001", "Prefiere horarios de tarde")
+    agenda.cupos_en_disputa.add("K002")
+    llm = LLMGuionado(respuestas=[
+        AIMessage(content="", tool_calls=[{"name": "reagendar_cita", "id": "1",
+                                           "args": {"cita_id": "C001", "nuevo_cupo_id": "K002"}}]),
+        AIMessage(content="", tool_calls=[{"name": "reagendar_cita", "id": "2",
+                                           "args": {"cita_id": "C001", "nuevo_cupo_id": "K003"}}]),
+        AIMessage(content="<think>...</think>Listo, quedó a las 16:00."),
+    ])
+    monkeypatch.setattr(agente, "crear_llm", lambda *a, **k: llm)
+    bot = agente.ConectaBot()
+    respuesta = bot.chatear("P001", "Cámbiame el examen a la tarde")
+    assert respuesta == "Listo, quedó a las 16:00."
+    assert agenda.detalle_cita("C001")["hora"] == "16:00"
+    prompt_sistema = [m for m in llm.recibido[0] if m.type == "system"][0].content
+    assert "P001" in prompt_sistema and "Prefiere horarios de tarde" in prompt_sistema
+
+
+def test_guardrail_no_llama_al_llm(agenda, memoria, monkeypatch):
+    import src.agent as agente
+    llm = LLMGuionado(respuestas=[AIMessage(content="no debería usarse")])
+    monkeypatch.setattr(agente, "crear_llm", lambda *a, **k: llm)
+    respuesta = agente.ConectaBot().chatear("P003", "Tengo dolor en el pecho")
+    assert "urgencias" in respuesta and llm.i == 0
