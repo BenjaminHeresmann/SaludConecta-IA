@@ -41,9 +41,12 @@ class Plan(BaseModel):
 
 
 # ---------------- estado ----------------
-def construir_estado(agenda: Agenda, cupos_liberados: list[str]) -> dict:
+def construir_estado(agenda: Agenda, cupos_liberados: list[str], solo_citas: list[str] | None = None) -> dict:
+    """Estado para el planificador. Con `solo_citas` se planifica solo esas citas (aviso puntual de ConectaBot)."""
     citas = []
-    for c in agenda.citas_proximas(dias=2):
+    fuente = ([agenda.detalle_cita(c) for c in solo_citas if agenda.datos["citas"][c]["estado"] != "cancelada"]
+              if solo_citas is not None else agenda.citas_proximas(dias=2))
+    for c in fuente:
         riesgo = agenda.riesgo_inasistencia(c["cita_id"])
         paciente = agenda.datos["pacientes"][c["paciente_id"]]
         citas.append({"cita_id": c["cita_id"], "paciente_id": c["paciente_id"], "fecha": c["fecha"],
@@ -215,13 +218,13 @@ def mostrar_plan(plan: Plan, origen: str):
 def ejecutar(objetivo: str = "Gestionar las citas de las próximas 48 horas para reducir inasistencias",
              eventos: dict[int, Callable[[Agenda], str]] | None = None, llm=None,
              agenda: Agenda | None = None, max_replan: int = 3,
-             cupos_liberados: list[str] | None = None) -> dict:
+             cupos_liberados: list[str] | None = None, solo_citas: list[str] | None = None) -> dict:
     """Ejecuta el plan. `eventos` simula cambios del entorno: {n° de paso: función(agenda) -> cupo liberado}.
     `cupos_liberados`: cupos que ya estaban libres por cancelaciones previas (ej. hechas desde el chat)."""
     agenda = agenda or obtener_agenda()
     eventos = dict(eventos or {})
     cupos_liberados = list(cupos_liberados or [])
-    plan, origen = planificar(objetivo, construir_estado(agenda, cupos_liberados), llm)
+    plan, origen = planificar(objetivo, construir_estado(agenda, cupos_liberados, solo_citas), llm)
     mostrar_plan(plan, origen)
     pendientes, hechos, completados, replans, n = list(plan.pasos), [], set(), 0, 0
 
@@ -247,7 +250,7 @@ def ejecutar(objetivo: str = "Gestionar las citas de las próximas 48 horas para
             motivo_replan = descripcion
         if motivo_replan and replans < max_replan:
             replans += 1
-            estado = construir_estado(agenda, cupos_liberados)
+            estado = construir_estado(agenda, cupos_liberados, solo_citas)
             nuevo, origen = planificar(objetivo, estado, llm, ya_hecho=hechos)
             nuevo.pasos = [p for p in nuevo.pasos if f"{p.accion} {p.objetivo}" not in hechos]
             registrar("replan", f"Replanificación {replans} por: {motivo_replan}")

@@ -125,6 +125,7 @@ python -m src.demo --pausa        # 2. demo de 6 escenarios, con pausa entre ell
 python -m src.agent --paciente P001 --reset   # chat libre con un paciente
 python -m src.demo --sin-llm      # modo coordinador con el planificador por reglas (sin API)
 python -m src.coordinador         # coordinador sobre la agenda actual (ve lo que hicieron los pacientes en el chat)
+# En el chat libre (src.agent), cada cancelación o reagendamiento se avisa al Coordinador, que planifica la cita afectada.
 python -m src.coordinador --reiniciar   # deja la agenda como al inicio
 ```
 

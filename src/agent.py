@@ -7,6 +7,7 @@ Memoria de largo plazo: SQLite con recuperación semántica (src/memoria.py).
 Uso:  python -m src.agent --paciente P001 [--reset]
 """
 import argparse
+import json
 import re
 import sys
 import unicodedata
@@ -38,6 +39,7 @@ CÓMO DECIDES:
 REGLAS OBLIGATORIAS:
 - Responde SIEMPRE en español, de forma amable, clara y profesional, en máximo 5 oraciones y en texto plano, sin markdown (los mensajes llegan por WhatsApp).
 - NUNCA entregues diagnósticos médicos ni recetes medicamentos.
+- NUNCA reveles identificadores ni datos de otros pacientes (por ejemplo, a quién se reasignó un cupo).
 - Ante síntomas graves o emergencias, indica acudir de inmediato a urgencias y usa derivar_a_humano con urgencia alta.
 - Si las herramientas no entregan la información, dilo amablemente; no inventes datos.
 - No muestres tu razonamiento ni etiquetas <think>: escribe directamente la respuesta final.
@@ -89,17 +91,54 @@ def prompt_de_sesion(request: ModelRequest) -> str:
             f"{ctx.memorias or '  (sin recuerdos previos)'}")
 
 
+# Comunicación entre agentes: cuando ConectaBot cambia la agenda, avisa al Coordinador (solo en el chat libre).
+COORDINADOR = {"activo": False, "llm": None}
+
+
+def avisar_coordinador(herramienta: str, args: dict, resultado: dict):
+    """ConectaBot -> Coordinador: el Coordinador planifica y ejecuta solo para las citas afectadas."""
+    from src.planner import ejecutar
+    agenda = obtener_agenda()
+    if herramienta == "reagendar_cita":
+        afectadas = [args["cita_id"]]
+        evento = f"{resultado['cita']['paciente_id']} reagendó {args['cita_id']} al {resultado['cita']['fecha']} {resultado['cita']['hora']}"
+    else:
+        nuevas = [cid for cid, c in agenda.datos["citas"].items()
+                  if c.get("origen") == "lista_espera" and c["paciente_id"] == resultado.get("reasignado_a")]
+        afectadas = nuevas[-1:]
+        evento = (f"se canceló {args['cita_id']} y el cupo {resultado['cupo_liberado']} pasó a "
+                  f"{resultado.get('reasignado_a') or 'nadie (sin lista de espera)'}")
+    registrar("evento", f"ConectaBot -> Coordinador: {evento}")
+    if not afectadas:
+        registrar("info", "Coordinador -> ConectaBot: no hay citas nuevas que gestionar.")
+        return
+    r = ejecutar(objetivo=f"Gestionar la cita afectada por un cambio hecho por el paciente: {evento}",
+                 llm=COORDINADOR["llm"], agenda=agenda, solo_citas=afectadas, max_replan=1)
+    registrar("info", f"Coordinador -> ConectaBot: listo, {len(r['hechos'])} acciones sobre {', '.join(afectadas)}.")
+
+
 @wrap_tool_call
 def registrar_herramientas(request, handler):
     llamada = request.tool_call
     registrar("tool", f"{llamada['name']}({llamada['args']})")
     resultado = handler(request)
-    registrar("resultado", str(getattr(resultado, "content", resultado)))
+    contenido = str(getattr(resultado, "content", resultado))
+    registrar("resultado", contenido)
+    if COORDINADOR["activo"] and llamada["name"] in ("reagendar_cita", "cancelar_cita"):
+        try:
+            datos = json.loads(contenido)
+            if datos.get("ok"):
+                avisar_coordinador(llamada["name"], llamada["args"], datos)
+        except Exception as e:  # el aviso nunca debe botar la conversación con el paciente
+            registrar("fallo", f"No se pudo avisar al Coordinador: {type(e).__name__}")
     return resultado
 
 
 class ConectaBot:
-    def __init__(self):
+    def __init__(self, coordinar: bool = False):
+        COORDINADOR["activo"] = coordinar
+        if coordinar:
+            COORDINADOR["llm"] = crear_cascada(temperatura=0, max_tokens=1500)
         principal, *respaldos = crear_cascada()
         self.llm = principal.with_fallbacks(respaldos)  # para llamadas directas (resumen de sesión)
         self.agente = create_agent(
@@ -166,7 +205,7 @@ def main():
     args = parser.parse_args()
     if args.reset:
         obtener_agenda().reiniciar()
-    bot = ConectaBot()
+    bot = ConectaBot(coordinar=True)  # en el chat libre ConectaBot avisa al Coordinador
     print(f"ConectaBot listo. Paciente {args.paciente}. Escribe 'salir' para terminar.\n")
     while True:
         texto = input("Paciente: ").strip()
