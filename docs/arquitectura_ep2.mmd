@@ -3,7 +3,7 @@ flowchart LR
         U[Paciente<br/>chat o WhatsApp simulado] --> G{Guardrail<br/>de emergencias}
         G -- emergencia --> H[derivar_a_humano<br/>urgencia alta]
         G -- consulta normal --> A[ConectaBot<br/>LangChain create_agent<br/>ciclo ReAct en LangGraph]
-        A <--> LLM[Groq: Qwen3.8 27B<br/>respaldo: GPT-OSS 120B]
+        A <--> LLM[Groq: GPT-OSS 120B<br/>respaldos: GPT-OSS 20B y Qwen3.8]
         A <--> MC[Memoria de corto plazo<br/>checkpointer + resumen]
         A --> TC[Tools de consulta]
         A --> TE[Tools de escritura]

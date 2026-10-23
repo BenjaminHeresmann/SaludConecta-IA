@@ -20,7 +20,7 @@ flowchart LR
         U[Paciente<br/>chat o WhatsApp simulado] --> G{Guardrail<br/>de emergencias}
         G -- emergencia --> H[derivar_a_humano<br/>urgencia alta]
         G -- consulta normal --> A[ConectaBot<br/>LangChain create_agent<br/>ciclo ReAct en LangGraph]
-        A <--> LLM[Groq: Qwen3.8 27B<br/>respaldo: GPT-OSS 120B]
+        A <--> LLM[Groq: GPT-OSS 120B<br/>respaldos: GPT-OSS 20B y Qwen3.8]
         A <--> MC[Memoria de corto plazo<br/>checkpointer + resumen]
         A --> TC[Tools de consulta]
         A --> TE[Tools de escritura]
@@ -61,7 +61,7 @@ El sistema tiene dos modos:
 | Componente | Tecnología | Archivo |
 |---|---|---|
 | Framework de agentes | LangChain 1.4 `create_agent` (grafo de LangGraph) con middleware | `src/agent.py` |
-| LLM | Groq, `qwen/qwen3.8-27b`, razonamiento oculto; respaldo `openai/gpt-oss-120b` con `ModelFallbackMiddleware` | `src/config.py` |
+| LLM | Groq en cascada: `openai/gpt-oss-120b` (principal), `openai/gpt-oss-20b` y `qwen/qwen3.8-27b` con `ModelFallbackMiddleware`; sin reintentos ante un límite de uso (429), pasa al siguiente modelo | `src/config.py` |
 | RAG | `PyPDFDirectoryLoader` + `TextLoader`, chunks 350/50, FAISS, k=3. Embeddings locales con FastEmbed (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dim) por defecto; `gemini-embedding-001` (EP1) opcional con `EMBEDDINGS_PROVIDER=gemini` | `src/rag_engine.py` |
 | Memoria de corto plazo | `InMemorySaver` (un `thread_id` por sesión) + `SummarizationMiddleware` (sobre 14 mensajes resume y conserva 6) | `src/agent.py` |
 | Memoria de largo plazo | SQLite con embedding por recuerdo y recuperación por similitud coseno; respaldo por palabras si no hay API | `src/memoria.py` |
@@ -176,7 +176,7 @@ SaludConecta-IA/
 - El riesgo de inasistencia usa reglas con pesos fijos, no el clasificador entrenado que propusimos en la EP1. No tiene métricas de recall.
 - `protocolos_ampliados.md` es un documento simulado para el proyecto; no reemplaza indicaciones médicas.
 - La memoria de corto plazo vive en RAM: al reiniciar el agente solo queda la de largo plazo.
-- Groq tiene límites de uso por minuto en el plan gratuito; si se exceden, el agente pasa al modelo de respaldo.
+- Groq gratis tiene cuotas por minuto y por modelo (`qwen/qwen3.8-27b`: 1.000 tokens de salida por minuto; `gpt-oss-120b`: 8.000 tokens por minuto). Por eso hay una cascada de modelos. En la demo en vivo la latencia promedio con LLM fue 8,3 s (`docs/evidencia_demo_ep2.txt`).
 - En la EP1 los embeddings eran de Gemini. En la EP2 la API de Gemini devolvió `403 PERMISSION_DENIED` para el proyecto de la clave, por eso el valor por defecto es un modelo local; el índice de Gemini sigue disponible como opción.
 - FAISS (C++) no abre rutas con tildes en Windows: el índice se guarda como bytes desde Python (`faiss_index_local/indice_ep2.bin`).
 
