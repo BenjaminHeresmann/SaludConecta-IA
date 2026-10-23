@@ -10,3 +10,6 @@ __pycache__/
 
 # Estado generado al ejecutar el agente (se recrea con --reset)
 data/runtime/
+
+# Modelos de embeddings locales descargados
+modelos-ia/

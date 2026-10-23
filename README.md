@@ -20,14 +20,14 @@ flowchart LR
         U[Paciente<br/>chat o WhatsApp simulado] --> G{Guardrail<br/>de emergencias}
         G -- emergencia --> H[derivar_a_humano<br/>urgencia alta]
         G -- consulta normal --> A[ConectaBot<br/>LangChain create_agent<br/>ciclo ReAct en LangGraph]
-        A <--> LLM[Groq: Qwen 3.6 27B<br/>respaldo: Llama 3.3 70B]
+        A <--> LLM[Groq: Qwen3.8 27B<br/>respaldo: GPT-OSS 120B]
         A <--> MC[Memoria de corto plazo<br/>checkpointer + resumen]
         A --> TC[Tools de consulta]
         A --> TE[Tools de escritura]
         A --> TR[Tool de razonamiento]
     end
     subgraph DAT[Datos y conocimiento]
-        RAG[RAG: FAISS +<br/>Gemini embeddings]
+        RAG[RAG: FAISS +<br/>embeddings locales]
         AG[(Agenda simulada)]
         ML[(Memoria de largo plazo<br/>SQLite + similitud coseno)]
         WA[(Mensajes enviados)]

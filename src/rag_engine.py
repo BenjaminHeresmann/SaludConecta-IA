@@ -6,7 +6,9 @@ from langchain_community.document_loaders import DirectoryLoader, PyPDFDirectory
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from src.config import DOCS_RAG, FAISS_DIR, crear_embeddings
+from src.config import DOCS_RAG, FAISS_DIR, PROVEEDOR_EMBEDDINGS, crear_embeddings
+
+INDICE = FAISS_DIR / "indice_ep2.bin"
 
 
 def build_vectorstore():
@@ -21,10 +23,13 @@ def build_vectorstore():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=350, chunk_overlap=50)
     chunks = text_splitter.split_documents(documents)
 
-    print(f"Generando embeddings con Google Gemini para {len(chunks)} fragmentos...")
+    print(f"Generando embeddings ({PROVEEDOR_EMBEDDINGS}) para {len(chunks)} fragmentos...")
     vectorstore = FAISS.from_documents(chunks, crear_embeddings())
-    vectorstore.save_local(str(FAISS_DIR))
-    print("Base de datos vectorial creada y guardada en faiss_index/.")
+    # Se guarda como bytes desde Python: el save_local de FAISS (C++) falla en Windows
+    # cuando la ruta tiene tildes (ej. "Evaluación").
+    FAISS_DIR.mkdir(parents=True, exist_ok=True)
+    INDICE.write_bytes(vectorstore.serialize_to_bytes())
+    print(f"Base de datos vectorial creada y guardada en {INDICE.relative_to(FAISS_DIR.parent)}.")
     return vectorstore
 
 
@@ -34,7 +39,8 @@ _vectorstore = None
 def cargar_vectorstore():
     global _vectorstore
     if _vectorstore is None:
-        _vectorstore = FAISS.load_local(str(FAISS_DIR), crear_embeddings(), allow_dangerous_deserialization=True)
+        _vectorstore = FAISS.deserialize_from_bytes(INDICE.read_bytes(), crear_embeddings(),
+                                                    allow_dangerous_deserialization=True)
     return _vectorstore
 
 

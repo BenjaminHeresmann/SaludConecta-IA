@@ -56,8 +56,9 @@ class MemoriaLargoPlazo:
         q = self._vector(consulta)
         resultados = []
         for tipo, texto, creado, vector in filas:
-            if q is not None and vector:
-                a, b = np.array(q), np.array(json.loads(vector))
+            b = np.array(json.loads(vector)) if vector else None
+            if q is not None and b is not None and len(q) == len(b):  # mismo modelo de embeddings
+                a = np.array(q)
                 score = float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
                 metodo = "coseno"
             else:

@@ -7,11 +7,14 @@
 """
 import argparse
 import sys
+import time
 
 from colorama import Fore, Style
 
 from src.agenda import obtener_agenda
 from src.memoria import obtener_memoria
+
+LATENCIAS: list[float] = []
 
 
 def titulo(n: int, texto: str, condicion: str):
@@ -21,8 +24,12 @@ def titulo(n: int, texto: str, condicion: str):
 
 def turno(bot, paciente: str, mensaje: str, sesion: str = "1"):
     print(f"\n{Fore.GREEN}{Style.BRIGHT}{paciente}:{Style.RESET_ALL} {mensaje}")
+    inicio = time.perf_counter()
     respuesta = bot.chatear(paciente, mensaje, sesion)
+    segundos = time.perf_counter() - inicio
+    LATENCIAS.append(segundos)
     print(f"{Fore.CYAN}{Style.BRIGHT}ConectaBot:{Style.RESET_ALL} {respuesta}")
+    print(f"{Style.DIM}  (latencia: {segundos:.1f} s){Style.RESET_ALL}")
 
 
 def escenario_1(bot):
@@ -61,7 +68,9 @@ def escenario_6(llm=None):
     titulo(6, "Modo coordinador: plan por prioridades y replanificación",
            "mientras corre el plan, P007 cancela su cardiología por teléfono")
     obtener_agenda().reiniciar()
+    inicio = time.perf_counter()
     ejecutar(eventos={2: evento_cancelacion("C007", "aviso telefónico: viaje de trabajo")}, llm=llm)
+    print(f"{Style.DIM}  (duración del modo coordinador: {time.perf_counter() - inicio:.1f} s){Style.RESET_ALL}")
 
 
 def main():

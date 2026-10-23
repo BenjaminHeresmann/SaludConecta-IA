@@ -10,11 +10,15 @@ load_dotenv(RAIZ / ".env")
 DATA = RAIZ / "data"
 DOCS_RAG = DATA / "docs_rag"
 RUNTIME = DATA / "runtime"          # estado generado al ejecutar (agenda, memoria, logs)
-FAISS_DIR = RAIZ / "faiss_index"
-
-MODELO_LLM = os.getenv("GROQ_MODEL", "qwen/qwen3.6-27b")
-MODELO_RESPALDO = os.getenv("GROQ_MODEL_FALLBACK", "llama-3.3-70b-versatile")
+MODELO_LLM = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
+MODELO_RESPALDO = os.getenv("GROQ_MODEL_FALLBACK", "openai/gpt-oss-120b")
 MODELO_EMBEDDINGS = os.getenv("GOOGLE_EMBEDDING_MODEL", "gemini-embedding-001")
+
+# Embeddings: "local" (FastEmbed, sin API ni clave; por defecto) o "gemini" (API de Google, como en la EP1).
+# Cada proveedor tiene su propio índice FAISS porque los vectores no son compatibles entre sí.
+PROVEEDOR_EMBEDDINGS = os.getenv("EMBEDDINGS_PROVIDER", "local").lower()
+MODELO_EMBEDDINGS_LOCAL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+FAISS_DIR = RAIZ / ("faiss_index_local" if PROVEEDOR_EMBEDDINGS == "local" else "faiss_index")
 
 
 def crear_llm(modelo: str | None = None, temperatura: float = 0.1):
@@ -33,7 +37,14 @@ def crear_llm(modelo: str | None = None, temperatura: float = 0.1):
 
 
 def crear_embeddings():
-    """Embeddings de Gemini (768 dimensiones), los mismos con que se construyó el índice FAISS."""
+    """Gemini (768 dimensiones, índice de la EP1) o modelo local multilingüe (384 dimensiones)."""
+    if PROVEEDOR_EMBEDDINGS == "local":
+        from langchain_community.embeddings import FastEmbedEmbeddings
+
+        # Caché en una ruta corta (raíz de la unidad): Windows falla con rutas de más de 260 caracteres.
+        cache = os.getenv("FASTEMBED_CACHE", str(Path(RAIZ.anchor) / "modelos-ia"))
+        return FastEmbedEmbeddings(model_name=MODELO_EMBEDDINGS_LOCAL, cache_dir=cache)
+
     from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
     return GoogleGenerativeAIEmbeddings(
