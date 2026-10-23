@@ -1,0 +1,120 @@
+Demo en vivo SaludConecta-IA EP2 - 2026-10-23 18:28:45 - modelo principal openai/gpt-oss-120b, embeddings locales
+
+==============================================================================
+ESCENARIO 1. Consulta de preparación (RAG semántico)
+Condición del entorno: pregunta sin las palabras exactas del protocolo
+==============================================================================
+
+P001: Hola, para mi examen de sangre, ¿puedo tomar desayuno o un café antes?
+  [TOOL] buscar_protocolos({'consulta': 'preparación examen de sangre ayuno café desayuno'})
+  [RESULTADO] {"ok": true, "fragmentos": [{"texto": "Red de Salud SaludConecta - Protocolo de Exámenes\nExámenes de Sangre: El paciente debe acudir con un ayuno\nobligatorio de 8 a 12 horas. Solo se permite beber agua.\nPolíticas de Cancelación: Las citas se pueden cancelar...
+ConectaBot: Para los exámenes de sangre debe mantener un ayuno de 8 a 12 horas; solo está permitido beber agua. No se permite tomar desayuno ni café antes de la extracción.
+  (latencia: 5.4 s)
+
+==============================================================================
+ESCENARIO 2. Cancelación y recuperación del cupo
+Condición del entorno: paciente cancela; hay lista de espera de la especialidad
+==============================================================================
+
+P002: No voy a poder ir a mi hora de dermatología, se me complicó el trabajo. Cancélala por favor.
+  [TOOL] consultar_citas_paciente({'paciente_id': 'P002'})
+  [RESULTADO] {"ok": true, "citas": [{"cita_id": "C002", "paciente_id": "P002", "cupo_id": "K010", "tipo": "consulta", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 30, "sede": "Valparaíso", "especialidad": "Dermatología", "fecha": "2026-10-25", "h...
+  [TOOL] cancelar_cita({'cita_id': 'C002', 'motivo': 'Trabajo'})
+  [RESULTADO] {"ok": true, "cita_id": "C002", "cupo_liberado": "K010", "horas_de_anticipacion": 39.5, "sin_costo": true, "candidatos_lista_espera": [{"paciente_id": "P011", "especialidad": "Dermatología", "sede_preferida": "Valparaíso", "urgencia": 2, "dias_en_espera": 15}]...
+ConectaBot: Su cita de dermatología del 25/10 a las 10:00 ha sido cancelada sin costo. El cupo liberado ha sido asignado a otro paciente en lista de espera. Si necesita reprogramar, avísenos.
+  (latencia: 1.6 s)
+
+==============================================================================
+ESCENARIO 3. Reagendamiento con cupo tomado por otro canal
+Condición del entorno: el primer cupo de la tarde lo toma el call center
+==============================================================================
+
+P001: Necesito cambiar mi examen de sangre para la tarde, yo siempre prefiero las tardes.
+  [TOOL] consultar_citas_paciente({'paciente_id': 'P001'})
+  [RESULTADO] {"ok": true, "citas": [{"cita_id": "C001", "paciente_id": "P001", "cupo_id": "K001", "tipo": "examen de sangre", "estado": "agendada", "confirmada": false, "dias_anticipacion_reserva": 7, "sede": "Viña del Mar", "especialidad": "Laboratorio", "fecha": "2026-10...
+  [TOOL] buscar_cupos_disponibles({'especialidad': 'Laboratorio', 'franja': 'tarde', 'sede': 'Viña del Mar'})
+  [RESULTADO] {"ok": true, "cupos": [{"cupo_id": "K002", "sede": "Viña del Mar", "especialidad": "Laboratorio", "medico": "LAB-01", "hora": "15:00", "estado": "libre", "fecha": "2026-10-25"}, {"cupo_id": "K003", "sede": "Viña del Mar", "especialidad": "Laboratorio", "medico...
+  [TOOL] reagendar_cita({'cita_id': 'C001', 'nuevo_cupo_id': 'K002'})
+  [RESULTADO] {"ok": false, "error": "El cupo K002 fue tomado por otro canal hace instantes. Busca otra alternativa."}
+  [TOOL] buscar_cupos_disponibles({'especialidad': 'Laboratorio', 'franja': 'tarde', 'sede': 'Viña del Mar'})
+  [RESULTADO] {"ok": true, "cupos": [{"cupo_id": "K003", "sede": "Viña del Mar", "especialidad": "Laboratorio", "medico": "LAB-02", "hora": "16:00", "estado": "libre", "fecha": "2026-10-25"}, {"cupo_id": "K004", "sede": "Viña del Mar", "especialidad": "Laboratorio", "medico...
+  [TOOL] reagendar_cita({'cita_id': 'C001', 'nuevo_cupo_id': 'K003'})
+  [RESULTADO] {"ok": true, "cita": {"cita_id": "C001", "paciente_id": "P001", "cupo_id": "K003", "tipo": "examen de sangre", "estado": "agendada", "confirmada": true, "dias_anticipacion_reserva": 7, "sede": "Viña del Mar", "especialidad": "Laboratorio", "fecha": "2026-10-25...
+ConectaBot: Su cita de examen de sangre ha sido reprogramada para el 25 de octubre de 2026 a las 16:00 hs en la sede Viña del Mar y ya está confirmada. Recuerde mantener el ayuno de 8‑12 horas y solo tomar agua hasta la hora del examen. Si necesita algo más, estoy a su disposición.
+  (latencia: 5.8 s)
+
+==============================================================================
+ESCENARIO 4. Emergencia (guardrail)
+Condición del entorno: síntomas graves: no corresponde gestionar agenda
+==============================================================================
+
+P003: Tengo un dolor fuerte en el pecho y me cuesta respirar, ¿qué hago con mi hora de cardiología?
+  [GUARDRAIL] Señal de emergencia detectada: no se usa el LLM ni la agenda.
+ConectaBot: Por lo que describe, acuda de inmediato al servicio de urgencias más cercano o llame al 131 (SAMU). Ya avisé a un profesional de salud de SaludConecta. Su hora queda pendiente y la revisamos después; lo importante ahora es su salud.
+  (latencia: 0.0 s)
+
+==============================================================================
+ESCENARIO 5. Memoria entre sesiones
+Condición del entorno: se cierra la sesión y se reinicia el agente (sin historial de chat)
+==============================================================================
+  [MEMORIA] Resumen de sesión guardado para P001: Se reprogramó la cita de examen de sangre para el 25 de octubre de 2026 a las 16:00 hs en la sede Viña del Mar y quedó confirmada; se recordó mantener el ayuno de 8‑12 horas. No quedan pendientes adicionales.
+  (Agente reiniciado: solo queda la memoria de largo plazo en SQLite)
+
+P001: Hola de nuevo. ¿Me buscas una hora de medicina general? Ya sabes qué horario me acomoda.
+  [MEMORIA] Recuerdos recuperados: Se reprogramó la cita de examen de sangre para el 25 de octubre de 2026 a las 16:00 hs en la sede Viña del Mar y quedó confirmada; se recordó mantener el ayuno de 8‑12 horas. No quedan pendientes adicionales. (coseno 0.395)
+  [TOOL] recordar_paciente({'paciente_id': 'P001', 'tema': 'preferencia de horario'})
+  [RESULTADO] {"ok": true, "recuerdos": [{"tipo": "resumen_sesion", "texto": "Se reprogramó la cita de examen de sangre para el 25 de octubre de 2026 a las 16:00 hs en la sede Viña del Mar y quedó confirmada; se recordó mantener el ayuno de 8‑12 horas. No quedan pendientes ...
+  [TOOL] buscar_cupos_disponibles({'especialidad': 'Medicina General', 'franja': None, 'sede': None})
+  [RESULTADO] {"ok": true, "cupos": [{"cupo_id": "K051", "sede": "Viña del Mar", "especialidad": "Medicina General", "medico": "MG-01", "hora": "17:00", "estado": "libre", "fecha": "2026-10-25"}], "total": 1}
+ConectaBot: Encontré un cupo de Medicina General en Viña del Mar el 25 de octubre a las 17:00, que coincide con tu preferencia de tarde. ¿Quieres que lo reserve?
+  (latencia: 20.5 s)
+
+==============================================================================
+ESCENARIO 6. Modo coordinador: plan por prioridades y replanificación
+Condición del entorno: mientras corre el plan, P007 cancela su cardiología por teléfono
+==============================================================================
+  [PLAN] Ajustes al plan del LLM según el esquema de prioridades: agregado recordatorio_estandar C001; agregado recordatorio_estandar C005
+  [PLAN] Plan generado por LLM con 12 pasos (prioridad 1 = más urgente):
+      P2  #1  recordatorio_reforzado  C006  - Cita no confirmada con riesgo alto, necesita recordatorio reforzado
+      P2  #2  escalar_call_center     C006 tras [1]  - Riesgo alto y 4 inasistencias previas, escalar tras recordatorio reforzado
+      P2  #3  recordatorio_reforzado  C002  - Cita no confirmada con riesgo alto, necesita recordatorio reforzado
+      P2  #4  escalar_call_center     C002 tras [3]  - Riesgo alto y 3 inasistencias previas, escalar tras recordatorio reforzado
+      P3  #5  enviar_preparacion      C001  - Examen de sangre requiere envío de preparación
+      P3  #6  enviar_preparacion      C005  - Ecografía abdominal requiere envío de preparación
+      P4  #9  recordatorio_estandar   C008  - Cita no confirmada con riesgo medio, recordatorio estándar
+      P4  #12 recordatorio_estandar   C005  - Agregado: faltaba recordatorio (riesgo medio).
+      P5  #7  recordatorio_estandar   C003  - Cita no confirmada con riesgo bajo, recordatorio estándar
+      P5  #8  recordatorio_estandar   C004  - Cita no confirmada con riesgo bajo, recordatorio estándar
+      P5  #10 recordatorio_estandar   C007  - Cita no confirmada con riesgo bajo, recordatorio estándar
+      P5  #11 recordatorio_estandar   C001  - Agregado: faltaba recordatorio (riesgo bajo).
+  [PASO] 1. P2 recordatorio_reforzado C006: Recordatorio reforzado a P006.
+  [PASO] 2. P2 escalar_call_center C006: Cita C006 derivada al call center para llamada de confirmación.
+  [EVENTO] Cambio en el entorno: P007 canceló C007 (aviso telefónico: viaje de trabajo); se liberó K021.
+  [PLAN] Ajustes al plan del LLM según el esquema de prioridades: recordatorio_estandar C003: prioridad 4 -> 5; recordatorio_estandar C004: prioridad 4 -> 5; agregado recordatorio_estandar C001; agregado recordatorio_estandar C005
+  [REPLAN] Replanificación 1 por: P007 canceló C007 (aviso telefónico: viaje de trabajo); se liberó K021.
+  [PLAN] Plan generado por LLM con 10 pasos (prioridad 1 = más urgente):
+      P1  #1  reasignar_cupo          K021  - cupo libre para asignar a cita no confirmada de riesgo alto
+      P2  #2  recordatorio_reforzado  C002  - cita no confirmada riesgo alto
+      P2  #3  escalar_call_center     C002 tras [2]  - riesgo alto y 3+ inasistencias previas
+      P3  #7  enviar_preparacion      C001  - examen de sangre
+      P3  #8  enviar_preparacion      C005  - ecografía abdominal
+      P4  #6  recordatorio_estandar   C008  - cita no confirmada riesgo medio
+      P4  #10 recordatorio_estandar   C005  - Agregado: faltaba recordatorio (riesgo medio).
+      P5  #4  recordatorio_estandar   C003  - cita no confirmada riesgo bajo
+      P5  #5  recordatorio_estandar   C004  - cita no confirmada riesgo bajo
+      P5  #9  recordatorio_estandar   C001  - Agregado: faltaba recordatorio (riesgo bajo).
+  [PASO] 3. P1 reasignar_cupo K021: Cupo K021 asignado a P009 (urgencia 1).
+  [PASO] 4. P2 recordatorio_reforzado C002: Recordatorio reforzado a P002.
+  [PASO] 5. P2 escalar_call_center C002: Cita C002 derivada al call center para llamada de confirmación.
+  [PASO] 6. P3 enviar_preparacion C001: Preparación enviada a P001 (RAG).
+  [PASO] 7. P3 enviar_preparacion C005: Preparación enviada a P005 (RAG).
+  [PASO] 8. P4 recordatorio_estandar C008: Recordatorio estándar a P008.
+  [PASO] 9. P4 recordatorio_estandar C005: Recordatorio estándar a P005.
+  [PASO] 10. P5 recordatorio_estandar C003: Recordatorio estándar a P003.
+  [PASO] 11. P5 recordatorio_estandar C004: Recordatorio estándar a P004.
+  [PASO] 12. P5 recordatorio_estandar C001: Recordatorio estándar a P001.
+  [INFO] Fin: 12 pasos ejecutados, 1 replanificaciones.
+  (duración del modo coordinador: 2.9 s)
+EXIT 0 18:29:36
+
+Resumen (calculado de las latencias de arriba): consultas con LLM 5,4 / 1,6 / 5,8 / 20,5 s, promedio 8,3 s; guardrail 0,0 s; modo coordinador 2,9 s.

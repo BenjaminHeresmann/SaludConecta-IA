@@ -77,14 +77,6 @@ def reagendar_cita(cita_id: str, nuevo_cupo_id: str) -> str:
 
 @tool
 @_json
-def cancelar_cita(cita_id: str, motivo: str) -> str:
-    """Cancela una cita, libera su cupo e informa si fue con 24 horas de anticipación (sin costo).
-    Devuelve los candidatos de la lista de espera para ese cupo."""
-    return obtener_agenda().cancelar(cita_id, motivo)
-
-
-@tool
-@_json
 def reasignar_cupo_liberado(cupo_id: str) -> str:
     """Asigna un cupo liberado al paciente de mayor prioridad en la lista de espera
     (urgencia clínica, sede preferida, días en espera) y le avisa por WhatsApp."""
@@ -94,6 +86,25 @@ def reasignar_cupo_liberado(cupo_id: str) -> str:
     agenda.enviar_mensaje(cita["paciente_id"],
                           f"SaludConecta: se liberó una hora de {cita['especialidad']} para usted el "
                           f"{cita['fecha']} a las {cita['hora']} en sede {cita['sede']}. Responda SÍ para confirmar.")
+    return resultado
+
+
+@tool
+@_json
+def cancelar_cita(cita_id: str, motivo: str) -> str:
+    """Cancela una cita, informa si fue con 24 horas de anticipación (sin costo) y, en la misma
+    operación, reasigna el cupo liberado al paciente de mayor prioridad de la lista de espera.
+    Informa al paciente solo lo que diga el resultado (campo cupo_reasignado)."""
+    agenda = obtener_agenda()
+    resultado = agenda.cancelar(cita_id, motivo)
+    resultado.pop("siguiente_paso", None)
+    if resultado["candidatos_lista_espera"]:
+        # Cancelar y reasignar van juntos: un cupo liberado no debe depender de que el LLM recuerde reasignarlo.
+        reasignado = json.loads(reasignar_cupo_liberado.func(resultado["cupo_liberado"]))
+        resultado["cupo_reasignado"] = reasignado.get("ok", False)
+        resultado["reasignado_a"] = reasignado.get("paciente_asignado", {}).get("paciente_id")
+    else:
+        resultado["cupo_reasignado"] = False
     return resultado
 
 

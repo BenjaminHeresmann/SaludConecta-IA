@@ -113,14 +113,53 @@ def validar(plan: Plan, estado: dict) -> list[str]:
     return errores
 
 
+def prioridad_esperada(paso: Paso, riesgos: dict[str, str]) -> int:
+    fija = {"reasignar_cupo": 1, "recordatorio_reforzado": 2, "escalar_call_center": 2, "enviar_preparacion": 3}
+    if paso.accion in fija:
+        return fija[paso.accion]
+    return 4 if riesgos.get(paso.objetivo) == "medio" else 5
+
+
+def normalizar(plan: Plan, estado: dict, ya_hecho: list[str] | None = None) -> tuple[Plan, list[str]]:
+    """Guardrail del plan del LLM: corrige prioridades fuera del esquema y agrega recordatorios faltantes."""
+    riesgos = {c["cita_id"]: c["riesgo"] for c in estado["citas"]}
+    ajustes = []
+    for p in plan.pasos:
+        esperada = prioridad_esperada(p, riesgos)
+        if p.prioridad != esperada:
+            ajustes.append(f"{p.accion} {p.objetivo}: prioridad {p.prioridad} -> {esperada}")
+            p.prioridad = esperada
+    con_recordatorio = {p.objetivo for p in plan.pasos if p.accion.startswith("recordatorio")}
+    con_recordatorio |= {h.split()[1] for h in (ya_hecho or []) if h.startswith("recordatorio")}
+    siguiente = max((p.id for p in plan.pasos), default=0) + 1
+    for c in estado["citas"]:
+        if not c["confirmada"] and c["cita_id"] not in con_recordatorio:
+            accion = "recordatorio_reforzado" if c["riesgo"] == "alto" else "recordatorio_estandar"
+            nuevo = Paso(id=siguiente, accion=accion, objetivo=c["cita_id"], prioridad=1,
+                         razon=f"Agregado: faltaba recordatorio (riesgo {c['riesgo']}).")
+            nuevo.prioridad = prioridad_esperada(nuevo, riesgos)
+            plan.pasos.append(nuevo)
+            ajustes.append(f"agregado {accion} {c['cita_id']}")
+            siguiente += 1
+    return plan, ajustes
+
+
 def planificar(objetivo: str, estado: dict, llm=None, ya_hecho: list[str] | None = None) -> tuple[Plan, str]:
     if llm is not None:
         try:
             nota = ("Pasos YA EJECUTADOS (no repetir): " + "; ".join(ya_hecho)) if ya_hecho else ""
-            plan = llm.with_structured_output(Plan).invoke(PROMPT_PLANIFICADOR.format(
+            modelos = llm if isinstance(llm, list) else [llm]
+            cadena = modelos[0].with_structured_output(Plan).with_fallbacks(
+                [m.with_structured_output(Plan) for m in modelos[1:]])
+            plan = cadena.invoke(PROMPT_PLANIFICADOR.format(
                 objetivo=objetivo, ya_hecho=nota, estado=json.dumps(estado, ensure_ascii=False, indent=1)))
             errores = validar(plan, estado)
             if not errores:
+                if ya_hecho:  # no repetir pasos ya ejecutados
+                    plan.pasos = [p for p in plan.pasos if f"{p.accion} {p.objetivo}" not in ya_hecho]
+                plan, ajustes = normalizar(plan, estado, ya_hecho)
+                if ajustes:
+                    registrar("plan", "Ajustes al plan del LLM según el esquema de prioridades: " + "; ".join(ajustes))
                 return plan, "LLM"
             registrar("fallo", "Plan del LLM inválido, uso planificador por reglas: " + "; ".join(errores))
         except Exception as e:

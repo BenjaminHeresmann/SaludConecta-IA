@@ -155,9 +155,13 @@ class Agenda:
         cita["motivo_cancelacion"] = motivo
         cupo["estado"] = "libre"
         self._guardar()
-        return {"ok": True, "cita_id": cita_id, "cupo_liberado": cita["cupo_id"],
-                "horas_de_anticipacion": round(horas, 1), "sin_costo": horas >= 24,
-                "candidatos_lista_espera": self.candidatos_lista_espera(cita["cupo_id"])}
+        candidatos = self.candidatos_lista_espera(cita["cupo_id"])
+        resultado = {"ok": True, "cita_id": cita_id, "cupo_liberado": cita["cupo_id"],
+                     "horas_de_anticipacion": round(horas, 1), "sin_costo": horas >= 24,
+                     "candidatos_lista_espera": candidatos}
+        if candidatos:
+            resultado["siguiente_paso"] = f"Llama a reasignar_cupo_liberado con cupo_id {cita['cupo_id']}."
+        return resultado
 
     def candidatos_lista_espera(self, cupo_id: str) -> list[dict]:
         """Lista de espera de la especialidad del cupo, ordenada por prioridad:

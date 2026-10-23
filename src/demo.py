@@ -86,17 +86,21 @@ def main():
         return
 
     from src.agent import ConectaBot
-    from src.config import crear_llm
+    from src.config import crear_cascada
     if args.escenario in (None, 1):
         obtener_agenda().reiniciar()
         obtener_memoria().borrar_todo()
     bot = ConectaBot()
     escenarios = {1: escenario_1, 2: escenario_2, 3: escenario_3, 4: escenario_4, 5: escenario_5,
-                  6: lambda _bot: escenario_6(llm=crear_llm(temperatura=0))}
+                  6: lambda _bot: escenario_6(llm=crear_cascada(temperatura=0, max_tokens=2000))}
     for n in ([args.escenario] if args.escenario else range(1, 7)):
         escenarios[n](bot)
         if args.pausa and n < 6:
             input(f"\n{Style.DIM}[Enter para el siguiente escenario]{Style.RESET_ALL}")
+    con_llm = [s for s in LATENCIAS if s >= 0.1]  # el guardrail responde sin LLM (0 s)
+    if con_llm:
+        print(f"\nLatencia por consulta con LLM: promedio {sum(con_llm) / len(con_llm):.1f} s, "
+              f"mínimo {min(con_llm):.1f} s, máximo {max(con_llm):.1f} s ({len(con_llm)} consultas)")
 
 
 if __name__ == "__main__":

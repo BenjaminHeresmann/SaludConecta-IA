@@ -19,7 +19,7 @@ from langchain.agents.middleware import (ModelFallbackMiddleware, ModelRequest, 
 from langgraph.checkpoint.memory import InMemorySaver
 
 from src.agenda import obtener_agenda
-from src.config import MODELO_RESPALDO, crear_llm
+from src.config import MODELOS_RESPALDO, crear_cascada, crear_llm
 from src.memoria import obtener_memoria
 from src.registro import registrar
 from src.tools import HERRAMIENTAS, derivar_a_humano
@@ -30,16 +30,18 @@ Tu objetivo es reducir las inasistencias, recuperar cupos liberados y resolver l
 CÓMO DECIDES:
 1. Preparación de exámenes, ayunos, documentos, políticas, sedes u horarios: usa SIEMPRE buscar_protocolos y responde solo con esa información.
 2. Cambiar una hora: revisa las citas del paciente, considera sus preferencias guardadas, busca cupos compatibles y reagenda. Si un cupo ya no está disponible, elige la siguiente alternativa compatible y explica el cambio.
-3. Cancelar una hora: cancela, informa si fue sin costo (24 horas de anticipación) y reasigna el cupo liberado con reasignar_cupo_liberado.
+3. Cancelar una hora: usa cancelar_cita (también reasigna el cupo a la lista de espera) e informa si fue sin costo (24 horas de anticipación).
+6. Nunca digas que hiciste una acción que ninguna herramienta confirmó.
 4. Si el paciente expresa una preferencia estable (horario, sede, canal), guárdala con guardar_preferencia_paciente.
 5. Si el paciente tiene varias citas y no queda claro cuál quiere cambiar, pregunta antes de modificar.
 
 REGLAS OBLIGATORIAS:
-- Responde SIEMPRE en español, de forma amable, clara y profesional, en máximo 5 oraciones.
+- Responde SIEMPRE en español, de forma amable, clara y profesional, en máximo 5 oraciones y en texto plano, sin markdown (los mensajes llegan por WhatsApp).
 - NUNCA entregues diagnósticos médicos ni recetes medicamentos.
 - Ante síntomas graves o emergencias, indica acudir de inmediato a urgencias y usa derivar_a_humano con urgencia alta.
 - Si las herramientas no entregan la información, dilo amablemente; no inventes datos.
 - No muestres tu razonamiento ni etiquetas <think>: escribe directamente la respuesta final.
+- Tu respuesta final debe incluir toda la información que el paciente pidió, aunque ya la hayas enviado por WhatsApp.
 """
 
 # Guardrail determinista: se evalúa ANTES de llamar al LLM.
@@ -91,17 +93,20 @@ def registrar_herramientas(request, handler):
 
 class ConectaBot:
     def __init__(self):
-        llm = crear_llm()
-        self.llm = llm
+        principal, *respaldos = crear_cascada()
+        self.llm = principal.with_fallbacks(respaldos)  # para llamadas directas (resumen de sesión)
         self.agente = create_agent(
-            model=llm,
+            model=principal,
             tools=HERRAMIENTAS,
             middleware=[
                 prompt_de_sesion,
                 registrar_herramientas,
                 # Memoria de corto plazo en flujos largos: sobre 14 mensajes resume y deja los 6 últimos.
-                SummarizationMiddleware(model=llm, trigger=("messages", 14), keep=("messages", 6)),
-                ModelFallbackMiddleware(crear_llm(MODELO_RESPALDO)),
+                # El resumen usa otro modelo (otra cuota de Groq) y reintenta: no debe botar la conversación.
+                SummarizationMiddleware(model=crear_llm(MODELOS_RESPALDO[0], temperatura=0, reintentos=3),
+                                        trigger=("messages", 14), keep=("messages", 6)),
+                # Si el modelo principal falla o llega al límite de uso, se prueba el siguiente.
+                ModelFallbackMiddleware(*respaldos),
             ],
             context_schema=Contexto,
             checkpointer=InMemorySaver(),  # historial por thread_id (una sesión de chat)

@@ -173,7 +173,7 @@ def test_agente_se_recupera_de_cupo_tomado_y_usa_memoria(agenda, memoria, monkey
                                            "args": {"cita_id": "C001", "nuevo_cupo_id": "K003"}}]),
         AIMessage(content="<think>...</think>Listo, quedó a las 16:00."),
     ])
-    monkeypatch.setattr(agente, "crear_llm", lambda *a, **k: llm)
+    monkeypatch.setattr(agente, "crear_cascada", lambda *a, **k: [llm, llm])
     bot = agente.ConectaBot()
     respuesta = bot.chatear("P001", "Cámbiame el examen a la tarde")
     assert respuesta == "Listo, quedó a las 16:00."
@@ -185,6 +185,23 @@ def test_agente_se_recupera_de_cupo_tomado_y_usa_memoria(agenda, memoria, monkey
 def test_guardrail_no_llama_al_llm(agenda, memoria, monkeypatch):
     import src.agent as agente
     llm = LLMGuionado(respuestas=[AIMessage(content="no debería usarse")])
-    monkeypatch.setattr(agente, "crear_llm", lambda *a, **k: llm)
+    monkeypatch.setattr(agente, "crear_cascada", lambda *a, **k: [llm, llm])
     respuesta = agente.ConectaBot().chatear("P003", "Tengo dolor en el pecho")
     assert "urgencias" in respuesta and llm.i == 0
+
+
+def test_normaliza_prioridades_y_completa_recordatorios_del_plan_llm(agenda):
+    from src.planner import Paso, Plan, normalizar
+    estado = construir_estado(agenda, [])
+    plan_llm = Plan(pasos=[Paso(id=1, accion="recordatorio_estandar", objetivo="C003", prioridad=4, razon="x")])
+    plan, ajustes = normalizar(plan_llm, estado)
+    assert plan.pasos[0].prioridad == 5                       # C003 es riesgo bajo
+    objetivos = {p.objetivo for p in plan.pasos if p.accion.startswith("recordatorio")}
+    assert {"C001", "C002", "C005", "C006"} <= objetivos      # se agregaron los que faltaban
+    assert any("prioridad 4 -> 5" in a for a in ajustes)
+
+
+def test_cancelar_cita_reasigna_el_cupo_en_la_misma_operacion(agenda):
+    r = json.loads(cancelar_cita.invoke({"cita_id": "C007", "motivo": "viaje"}))
+    assert r["cupo_reasignado"] is True and r["reasignado_a"] == "P009"
+    assert agenda.datos["cupos"]["K021"]["estado"] == "ocupado"

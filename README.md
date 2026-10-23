@@ -143,7 +143,7 @@ python -m src.demo --sin-llm      # modo coordinador con el planificador por reg
 python -m pytest -v
 ```
 
-22 pruebas sin conexión (no llaman a Groq ni a Gemini): guardrails, herramientas, riesgo, lista de espera, cupo tomado, plan por prioridades, replanificación, memoria persistente y el ciclo completo del agente con un LLM simulado (recupera el error de cupo tomado y usa la memoria). Resultado: `docs/evidencia_tests_ep2.txt`. Cada ejecución de la demo deja su registro en `data/runtime/decisiones.jsonl`.
+24 pruebas sin conexión (no llaman a Groq ni a Gemini): guardrails, herramientas, riesgo, lista de espera, cupo tomado, cancelación con reasignación, plan por prioridades, corrección del plan del LLM, replanificación, memoria persistente y el ciclo completo del agente con un LLM simulado (recupera el error de cupo tomado y usa la memoria). Resultado: `docs/evidencia_tests_ep2.txt`. Registro de una demo en vivo con Groq: `docs/evidencia_demo_ep2.txt`. Cada ejecución de la demo deja su registro en `data/runtime/decisiones.jsonl`.
 
 ## Estructura
 
